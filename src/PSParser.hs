@@ -1,9 +1,12 @@
 module PSParser
-  ( parseExpr,
+  (
+    readExpr,
+    readExprList,
   LispVal(..)
   ) where
 
 import           Control.Monad
+import           Control.Monad.Except
 import           PSTypes
 import           System.IO
 import           Text.ParserCombinators.Parsec hiding (spaces)
@@ -58,3 +61,18 @@ parseExpr = parseAtom
          x <- try parseList <|> parseDottedList
          _ <- char ')'
          return x
+
+parseExprList :: Parser [LispVal]
+parseExprList = endBy parseExpr spaces
+
+readOrThrow :: (Parser a) -> String -> ThrowsError a
+readOrThrow parser input = case parse parser "lisp" input of
+  Left err  -> throwError $ Parser err
+  Right val -> return val
+
+readExpr :: String -> ThrowsError LispVal
+readExpr = readOrThrow parseExpr
+
+readExprList :: String -> ThrowsError [LispVal]
+readExprList = readOrThrow parseExprList
+

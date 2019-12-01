@@ -1,6 +1,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
 module PSEvaluator
   ( eval,
+    apply,
+    load,
     LispError(..),
     ThrowsError(..)
   ) where
@@ -9,7 +11,6 @@ import           Control.Monad
 import           Control.Monad.Except
 import           Data.IORef
 import           PSParser
-import           PSPrimitives
 import           PSTypes
 import           System.IO
 import           Text.ParserCombinators.Parsec hiding (spaces)
@@ -40,11 +41,16 @@ eval env (List (Atom "lambda" : DottedList params varargs : body)) =
      makeVarArgs varargs env params body
 eval env (List (Atom "lambda" : varargs@(Atom _) : body)) =
      makeVarArgs varargs env [] body
+eval env (List [Atom "load", String filename]) =
+     load filename >>= liftM last . mapM (eval env)
 eval env (List (function : args)) = do
      func <- eval env function
      argVals <- mapM (eval env) args
      apply func argVals
 eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+load :: String -> IOThrowsError [LispVal]
+load filename = (liftIO $ readFile filename) >>= liftThrows . readExprList
 
 apply :: LispVal -> [LispVal] -> IOThrowsError LispVal
 apply (PrimitiveFunc func) args = liftThrows $ func args
@@ -58,6 +64,7 @@ apply (Func params varargs body closure) args =
             bindVarArgs arg env = case arg of
                 Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
                 Nothing -> return env
+apply (IOFunc func) args = func args
 
 makeFunc :: (Maybe String) -> Env -> [LispVal] -> [LispVal] -> IOThrowsError LispVal
 makeFunc varargs env params body = return $ Func (map show params) varargs body env

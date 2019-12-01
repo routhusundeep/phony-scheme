@@ -13,10 +13,10 @@ module PSTypes
     bindVars
   ) where
 
-
 import           Control.Monad
 import           Control.Monad.Except
 import           Data.IORef
+import           System.IO
 import           Text.ParserCombinators.Parsec hiding (spaces)
 
 data LispVal = Atom String
@@ -28,6 +28,8 @@ data LispVal = Atom String
            | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
            | Func { params :: [String], vararg :: (Maybe String),
                     body :: [LispVal], closure :: Env}
+           | IOFunc ([LispVal] -> IOThrowsError LispVal)
+           | Port Handle
 
 instance Show LispVal where show = showVal
 showVal :: LispVal -> String
@@ -44,6 +46,8 @@ showVal (Func {params = args, vararg = varargs, body = _, closure = _}) =
   (case varargs of
      Nothing  -> ""
      Just arg -> "." ++ arg) ++ ") ...)"
+showVal (IOFunc _) = "<IO primitive>"
+showVal (Port _) = "<IO port>"
 
 unwordsList :: [LispVal] -> String
 unwordsList = unwords . map showVal
@@ -69,13 +73,11 @@ showError (Default s) = s
 
 type ThrowsError = Either LispError
 
-
 type Env = IORef [(String, IORef LispVal)]
 type IOThrowsError = ExceptT LispError IO
 
 nullEnv :: IO Env
 nullEnv = newIORef []
-
 
 liftThrows :: ThrowsError a -> IOThrowsError a
 liftThrows (Left err)  = throwError err

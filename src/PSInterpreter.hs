@@ -1,5 +1,9 @@
 module PSInterpreter
-  (evalString) where
+  (evalString,
+   eval,
+   runIOThrows,
+   readExpr,
+   readExprList) where
 
 import           Control.Monad.Except
 import           PSEvaluator
@@ -15,11 +19,6 @@ extractValue (Right val) = val
 
 runIOThrows :: IOThrowsError String -> IO String
 runIOThrows action = runExceptT (trapError action) >>= return . extractValue
-
-readExpr :: String -> ThrowsError LispVal
-readExpr input = case parse parseExpr "lisp" input of
-  Left err  -> throwError $ Parser err
-  Right val -> return val
 
 evalString :: Env -> String -> IO String
 evalString env expr = runIOThrows $ liftM show $ (liftThrows $ readExpr expr) >>= eval env
